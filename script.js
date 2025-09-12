@@ -245,7 +245,7 @@ function renderTotalsBar(txns) {
 }
 
 
-function exportTotals() {
+function exportTotalsold() {
   const txns = monthFilteredTxns();
   const { rows, grand } = computeCategoryTotals(txns);
   // Always use a friendly label like "August 2025" for both header and filename
@@ -266,6 +266,52 @@ function exportTotals() {
   a.click();
   a.remove();
 }
+function exportTotals() {
+  const txns = monthFilteredTxns();
+  const { rows, grand } = computeCategoryTotals(txns);
+
+  const label = friendlyMonthOrAll(MONTH_FILTER || getFirstTxnMonth(txns) || new Date());
+  const header = `SpendLite Category Totals (${label})`;
+
+  // dynamic widths for neat alignment
+  const catWidth = Math.max(8, ...rows.map(([cat]) => toTitleCase(cat).length), 'Category'.length);
+  const amtWidth = 12;
+  const pctWidth = 6;
+
+  const lines = [];
+  lines.push(header);
+  lines.push('='.repeat(header.length));
+  lines.push(
+    'Category'.padEnd(catWidth) + ' ' +
+    'Amount'.padStart(amtWidth) + ' ' +
+    '%'.padStart(pctWidth)
+  );
+
+  for (const [cat, total] of rows) {
+    const pct = grand ? (total / grand * 100) : 0;
+    lines.push(
+      toTitleCase(cat).padEnd(catWidth) + ' ' +
+      total.toFixed(2).padStart(amtWidth) + ' ' +
+      (pct.toFixed(1) + '%').padStart(pctWidth)
+    );
+  }
+
+  lines.push('');
+  lines.push(
+    'TOTAL'.padEnd(catWidth) + ' ' +
+    grand.toFixed(2).padStart(amtWidth) + ' ' +
+    '100%'.padStart(pctWidth)
+  );
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `category_totals_${forFilename(label)}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 
 function getFilteredTxns(txns) {
   if (!CURRENT_FILTER) return txns;
