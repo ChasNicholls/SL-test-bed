@@ -1,40 +1,3 @@
-
-// Cross-browser download helper with optional Save As
-async function saveTextWithPrompt(fileName, text, statusId) {
-  const ua = navigator.userAgent || '';
-  const isIOS = /iPad|iPhone|iPod/.test(ua);
-  const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
-  try {
-    const blob = new Blob([text], { type: 'text/plain' });
-    if (window.showSaveFilePicker) {
-      try {
-        const handle = await window.showSaveFilePicker({suggestedName: fileName, types:[{description:'Text',accept:{'text/plain':['.txt']}}]});
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        document.getElementById(statusId).textContent = `Saved as ${fileName}`;
-        return;
-      } catch(e){}
-    }
-    if (navigator.share && isIOS) {
-      const file = new File([blob], fileName, {type:'text/plain'});
-      try{await navigator.share({files:[file],title:fileName});}catch(e){}
-      document.getElementById(statusId).textContent = `Saved as ${fileName}`;
-      return;
-    }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = fileName; a.target='_blank'; a.rel='noopener';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    if (isIOS || isSafari){ try{window.open(url,'_blank');}catch(e){} }
-    setTimeout(()=>URL.revokeObjectURL(url),3000);
-    document.getElementById(statusId).textContent = `Saved as ${fileName}`;
-  } catch(err) {
-    console.error(err);
-    document.getElementById(statusId).textContent = `Save failed: ${err.message}`;
-  }
-}
-
 // SpendLite v6.6.27 – Month filter + export respects selected month
 // Keeps: UCASE categories, jolly theme, import/export rules, category filter, VISA- keyword, tabs export + grand total
 
@@ -368,14 +331,97 @@ function assignCategory(idx) {
   applyRulesAndRender();
 }
 
-async async function exportRules() {
-  const key = 'rulesExportCounter';
-  let n = parseInt(localStorage.getItem(key) || '0', 10) + 1;
-  localStorage.setItem(key, String(n));
+function exportRules() {
+  const text = document.getElementById('rulesBox').value || '';
+  const blob = new Blob([text], {type: 'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'rules_export.txt';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
 
-  const text = (document.getElementById('rulesBox')?.value) || '';
-  const fileName = `Rules-${n}.txt`;
-  await saveTextWithPrompt(fileName, text, 'rulesStatus');
+function importRulesFromFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const text = reader.result || '';
+    document.getElementById('rulesBox').value = text;
+    applyRulesAndRender();
+  };
+  reader.readAsText(file);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+// UI wiring
+document.getElementById('csvFile').addEventListener('change', (e) => {
+  const file = e.target.files?.[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { loadCsvText(reader.result); };
+  reader.readAsText(file);
+});
+document.getElementById('recalculateBtn').addEventListener('click', applyRulesAndRender);
+document.getElementById('exportRulesBtn').addEventListener('click', exportRules);
+document.getElementById('exportTotalsBtn').addEventListener('click', exportTotals);
+document.getElementById('importRulesBtn').addEventListener('click', () => document.getElementById('importRulesInput').click());
+document.getElementById('importRulesInput').addEventListener('change', (e) => {
+  const f = e.target.files && e.target.files[0]; if (f) importRulesFromFile(f);
+});
+document.getElementById('clearFilterBtn').addEventListener('click', () => {
+  CURRENT_FILTER = null; try { localStorage.removeItem(LS_KEYS.FILTER); } catch {}
+  updateFilterUI(); CURRENT_PAGE = 1; renderTransactionsTable(); renderMonthTotals(monthFilteredTxns());
+});
+document.getElementById('clearMonthBtn').addEventListener('click', () => {
+  MONTH_FILTER = ""; try { localStorage.removeItem(LS_KEYS.MONTH); } catch {}
+  document.getElementById('monthFilter').value = "";
+  updateMonthBanner();
+  CURRENT_PAGE = 1;
+  applyRulesAndRender();
+});
+document.getElementById('monthFilter').addEventListener('change', (e) => {
+  MONTH_FILTER = e.target.value || "";
+  try { localStorage.setItem(LS_KEYS.MONTH, MONTH_FILTER); } catch {}
+  updateMonthBanner();
+  CURRENT_PAGE = 1;
+  applyRulesAndRender();
+});
+
+window.addEventListener('DOMContentLoaded', async () => {
+  // Restore rules
+  let restored = false;
+  try { const saved = localStorage.getItem(LS_KEYS.RULES); if (saved && saved.trim()) { document.getElementById('rulesBox').value = saved; restored = true; } } catch {}
+  if (!restored) {
+    try { const res = await fetch('rules.txt'); const text = await res.text(); document.getElementById('rulesBox').value = text; restored = true; } catch {}
+  }
+  if (!restored) document.getElementById('rulesBox').value = SAMPLE_RULES;
+
+  // Restore filters
+  try { const savedFilter = localStorage.getItem(LS_KEYS.FILTER); CURRENT_FILTER = savedFilter && savedFilter.trim() ? savedFilter.toUpperCase() : null; } catch {}
+  try { const savedMonth = localStorage.getItem(LS_KEYS.MONTH); MONTH_FILTER = savedMonth || ""; } catch {}
+
+  updateFilterUI(); CURRENT_PAGE = 1;
+  updateMonthBanner();
+});
+
+const SAMPLE_RULES = `# Rules format: KEYWORD => CATEGORY
+OFFICEWORKS => OFFICE SUPPLIES
+COLES => GROCERIES
+SHELL => PETROL
+UBER => TRANSPORT
+WOOLWORTHS => GROCERIES
+BP => PETROL
+BUNNINGS => HARDWARE
+`;
+
+// --- Transactions collapse logic ---
+function isTxnsCollapsed() {
+  try { return localStorage.getItem(LS_KEYS.TXNS_COLLAPSED) !== 'false'; } catch { return true; }
+}
+function setTxnsCollapsed(v) {
+  try { localStorage.setItem(LS_KEYS.TXNS_COLLAPSED, v ? 'true' : 'false'); } catch {}
 }
 function applyTxnsCollapsedUI() {
   const body = document.getElementById('transactionsBody');
