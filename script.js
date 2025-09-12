@@ -244,7 +244,6 @@ function renderTotalsBar(txns) {
   el.innerHTML = `Rows: <strong>${txns.length}</strong> · Debit: <strong>$${sumDebit.toFixed(2)}</strong> · Credit: <strong>$${sumCredit.toFixed(2)}</strong> · Net: <strong>$${net.toFixed(2)}</strong> (${monthLabel})`;
 }
 
-
 function exportTotals() {
   alert('ExportTotals function called!');
   const txns = monthFilteredTxns();
@@ -257,7 +256,6 @@ function exportTotals() {
   for (const [cat, total] of rows) {
     const pct = grand !== 0 ? (total / grand * 100) : 0;
     lines.push(`${cat}\t${total.toFixed(2)}\t${pct.toFixed(1)}%`);
-  }
   lines.push('', `TOTAL\t${grand.toFixed(2)}\t100%`);
   const blob = new Blob([lines.join('\\n')], {type: 'text/plain'});
   const a = document.createElement('a');
@@ -266,6 +264,7 @@ function exportTotals() {
   document.body.appendChild(a);
   a.click();
   a.remove();
+
 }
 
 function getFilteredTxns(txns) {
