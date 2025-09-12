@@ -246,6 +246,7 @@ function renderTotalsBar(txns) {
 
 
 function exportTotals() {
+  alert('ExportTotals function called!');
   const txns = monthFilteredTxns();
   const { rows, grand } = computeCategoryTotals(txns);
   // Always use a friendly label like "August 2025" for both header and filename
