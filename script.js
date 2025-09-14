@@ -365,8 +365,61 @@ function nextWordAfter(marker, desc) {
   const m = after.match(/^([A-Za-z0-9&._]+)/); // merchant-like token
   return m ? m[1] : '';
 }
-
 function assignCategory(idx) {
+  const txn = CURRENT_TXNS[idx];
+  if (!txn) return;
+  const desc = txn.description || "";
+  const up = desc.toUpperCase();
+
+  // Suggested keyword: prefill PAYPAL <WORD> if present, else first/visa word
+  let suggestedKeyword = "";
+  if (/\bPAYPAL\b/.test(up)) {
+    const nxt = nextWordAfter('paypal', desc);
+    suggestedKeyword = ('PAYPAL' + (nxt ? ' ' + nxt : '')).toUpperCase();
+  } else {
+    const visaPos = up.indexOf("VISA-");
+    if (visaPos !== -1) {
+      const after = desc.substring(visaPos + 5).trim();
+      suggestedKeyword = (after.split(/\s+/)[0] || "").toUpperCase();
+    } else {
+      suggestedKeyword = (desc.split(/\s+/)[0] || "").toUpperCase();
+    }
+  }
+
+  // Prompt for keyword (user can edit)
+  const keywordInput = prompt("Enter keyword to match:", suggestedKeyword);
+  if (!keywordInput) return;
+  const keyword = keywordInput.trim().toUpperCase();
+
+  // Prompt for category (user chooses or adds)
+  const defaultCat = (txn.category || "UNCATEGORISED").toUpperCase();
+  const catInput = prompt("Enter category name:", defaultCat);
+  if (!catInput) return;
+  const category = catInput.trim().toUpperCase();
+
+  // Update or add rule
+  const box = document.getElementById('rulesBox');
+  const lines = String(box.value || "").split(/\r?\n/);
+  let updated = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = (lines[i] || "").trim();
+    if (!line || line.startsWith('#')) continue;
+    const parts = line.split(/=>/i);
+    if (parts.length >= 2) {
+      const k = parts[0].trim().toUpperCase();
+      if (k === keyword) {
+        lines[i] = `${keyword} => ${category}`;
+        updated = true;
+        break;
+      }
+    }
+  }
+  if (!updated) lines.push(`${keyword} => ${category}`);
+  box.value = lines.join("\n");
+  try { localStorage.setItem(LS_KEYS.RULES, box.value); } catch {}
+  if (typeof applyRulesAndRender === 'function') applyRulesAndRender();
+}
+function assignCategory2(idx) {
   const txn = CURRENT_TXNS[idx];
   if (!txn) return;
   const desc = txn.description || "";
