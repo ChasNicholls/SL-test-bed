@@ -365,13 +365,15 @@ function nextWordAfter(marker, desc) {
   const m = after.match(/^([A-Za-z0-9&._]+)/); // merchant-like token
   return m ? m[1] : '';
 }
+
+
 function assignCategory(idx) {
   const txn = CURRENT_TXNS[idx];
   if (!txn) return;
   const desc = txn.description || "";
   const up = desc.toUpperCase();
 
-  // Suggested keyword: prefill PAYPAL <WORD> if present, else first/visa word
+  // Build a suggested keyword
   let suggestedKeyword = "";
   if (/\bPAYPAL\b/.test(up)) {
     const nxt = nextWordAfter('paypal', desc);
@@ -386,18 +388,18 @@ function assignCategory(idx) {
     }
   }
 
-  // Prompt for keyword (user can edit)
+  // Let user confirm/edit keyword
   const keywordInput = prompt("Enter keyword to match:", suggestedKeyword);
   if (!keywordInput) return;
   const keyword = keywordInput.trim().toUpperCase();
 
-  // Prompt for category (user chooses or adds)
+  // Let user choose/add category (no automation)
   const defaultCat = (txn.category || "UNCATEGORISED").toUpperCase();
   const catInput = prompt("Enter category name:", defaultCat);
   if (!catInput) return;
   const category = catInput.trim().toUpperCase();
 
-  // Update or add rule
+  // Upsert into rulesBox
   const box = document.getElementById('rulesBox');
   const lines = String(box.value || "").split(/\r?\n/);
   let updated = false;
@@ -419,36 +421,7 @@ function assignCategory(idx) {
   try { localStorage.setItem(LS_KEYS.RULES, box.value); } catch {}
   if (typeof applyRulesAndRender === 'function') applyRulesAndRender();
 }
-function assignCategory2(idx) {
-  const txn = CURRENT_TXNS[idx];
-  if (!txn) return;
-  const desc = txn.description || "";
-  const up = desc.toUpperCase();
-  let suggested = "";
 
-  // Prefer PayPal pattern: "PAYPAL <nextword>"
-  if (/\bPAYPAL\b/.test(up)) {
-    const nxt = nextWordAfter('paypal', desc);
-    suggested = ('PAYPAL' + (nxt ? ' ' + nxt : '')).toUpperCase();
-  } else {
-    // Otherwise keep existing VISA- and fallback logic
-    const visaPos = up.indexOf("VISA-");
-    if (visaPos !== -1) {
-      const after = desc.substring(visaPos + 5).trim();
-      suggested = (after.split(/\s+/)[0] || "").toUpperCase();
-    } else {
-      suggested = (desc.split(/\s+/)[0] || "").toUpperCase();
-    }
-  }
-
-  const chosenKeyword = prompt("Enter keyword to match:", suggested);
-  if (!chosenKeyword) return;
-  const category = (prompt("Enter category name:", (txn.category || "UNCATEGORISED").toUpperCase()) || "").toUpperCase();
-  if (!category) return;
-  const rulesBox = document.getElementById('rulesBox');
-  rulesBox.value += `\n${chosenKeyword.trim()} => ${category}`;
-  applyRulesAndRender();
-}
 
 function exportRules() {
   const text = document.getElementById('rulesBox').value || '';
