@@ -145,17 +145,38 @@ function parseRules(text) {
   return rules;
 }
 
+
+// --- flexible keyword matcher: supports multi-word keywords in order, with anything between
+function matchesKeyword(descLower, keywordLower) {
+  if (!keywordLower) return false;
+  // simple fast path for single chunk keywords
+  if (!/\s/.test(keywordLower)) {
+    return descLower.includes(keywordLower);
+  }
+  const parts = keywordLower.split(/\s+/).filter(Boolean);
+  if (!parts.length) return false;
+  let pos = 0;
+  for (const p of parts) {
+    const i = descLower.indexOf(p, pos);
+    if (i === -1) return false;
+    pos = i + p.length;
+  }
+  return true;
+}
+
 function categorise(txns, rules) {
   for (const t of txns) {
-    const desc = t.description.toLowerCase();
+    const descLower = (t.description || '').toLowerCase();
     let matched = 'UNCATEGORISED';
     for (const r of rules) {
-      if (desc.includes(r.keyword)) { matched = r.category; break; }
+      // r.keyword is already lowercase from parseRules()
+      if (matchesKeyword(descLower, r.keyword)) { matched = r.category; break; }
     }
     t.category = matched;
   }
   return txns;
 }
+
 
 function computeCategoryTotals(txns) {
   const byCat = new Map();
