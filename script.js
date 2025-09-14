@@ -206,7 +206,7 @@ function renderMonthTotals() {
   const el = document.getElementById('monthTotals');
   if (el) {
     const label = friendlyMonthOrAll(MONTH_FILTER);
-    const cat = CURRENT_FILTER ? ` + category "${CURRENT_FILTER}"` : "";
+    const cat = CURRENT_FILTER ? ` + category \"${CURRENT_FILTER}\"` : "";
     el.innerHTML = `Showing <span class="badge">${count}</span> transactions for <strong>${friendlyMonthOrAll(MONTH_FILTER)}${cat}</strong> · ` +
                    `Debit: <strong>$${debit.toFixed(2)}</strong> · ` +
                    `Credit: <strong>$${credit.toFixed(2)}</strong> · ` +
@@ -321,7 +321,7 @@ function getFilteredTxns(txns) {
 function updateFilterUI() {
   const label = document.getElementById('activeFilter');
   const btn = document.getElementById('clearFilterBtn');
-  if (CURRENT_FILTER) { label.textContent = `— filtered by "${CURRENT_FILTER}"`; btn.style.display = ''; }
+  if (CURRENT_FILTER) { label.textContent = `— filtered by \"${CURRENT_FILTER}\"`; btn.style.display = ''; }
   else { label.textContent = ''; btn.style.display = 'none'; }
 }
 
@@ -355,25 +355,45 @@ function renderTransactionsTable(txns = monthFilteredTxns()) {
   renderPager(totalPages);
 }
 
+// --- helper: get next word after a marker (e.g., "paypal")
+function nextWordAfter(marker, desc) {
+  const lower = (desc || '').toLowerCase();
+  const i = lower.indexOf(String(marker).toLowerCase());
+  if (i === -1) return '';
+  // slice after the marker, trim separators like space, dash, colon, slash, asterisk
+  let after = (desc || '').slice(i + String(marker).length).replace(/^[\s\-:\/*]+/, '');
+  const m = after.match(/^([A-Za-z0-9&._]+)/); // merchant-like token
+  return m ? m[1] : '';
+}
+
 function assignCategory(idx) {
   const txn = CURRENT_TXNS[idx];
   if (!txn) return;
-  let desc = txn.description || "";
-  let suggested = "";
+  const desc = txn.description || "";
   const up = desc.toUpperCase();
-  const visaPos = up.indexOf("VISA-");
-  if (visaPos !== -1) {
-    const after = desc.substring(visaPos + 5).trim();
-    suggested = (after.split(/\s+/)[0] || "").toUpperCase();
+  let suggested = "";
+
+  // Prefer PayPal pattern: "PAYPAL <nextword>"
+  if (/\bPAYPAL\b/.test(up)) {
+    const nxt = nextWordAfter('paypal', desc);
+    suggested = ('PAYPAL' + (nxt ? ' ' + nxt : '')).toUpperCase();
   } else {
-    suggested = (desc.split(/\s+/)[0] || "").toUpperCase();
+    // Otherwise keep existing VISA- and fallback logic
+    const visaPos = up.indexOf("VISA-");
+    if (visaPos !== -1) {
+      const after = desc.substring(visaPos + 5).trim();
+      suggested = (after.split(/\s+/)[0] || "").toUpperCase();
+    } else {
+      suggested = (desc.split(/\s+/)[0] || "").toUpperCase();
+    }
   }
+
   const chosenKeyword = prompt("Enter keyword to match:", suggested);
   if (!chosenKeyword) return;
   const category = (prompt("Enter category name:", (txn.category || "UNCATEGORISED").toUpperCase()) || "").toUpperCase();
   if (!category) return;
   const rulesBox = document.getElementById('rulesBox');
-  rulesBox.value += `\n${chosenKeyword} => ${category}`;
+  rulesBox.value += `\n${chosenKeyword.trim()} => ${category}`;
   applyRulesAndRender();
 }
 
