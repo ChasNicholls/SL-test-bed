@@ -245,3 +245,23 @@ details#rulesDetails summary { cursor: pointer; }
 #categoryTotals table.cats th:first-child,
 #categoryTotals table.cats td:first-child { text-align: left !important; }
 #categoryTotals .num { text-align: right !important; }
+
+
+/* === Force Category Totals to the very left of the page === */
+main {
+  max-width: none;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+}
+
+#categoryTotals {
+  margin-left: 0 !important;
+  text-align: left !important;
+  width: fit-content !important;
+}
+
+#categoryTotals table.cats {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
